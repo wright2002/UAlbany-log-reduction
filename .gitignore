@@ -33,7 +33,6 @@ Thumbs.db
 *.bak
 *.tmp
 *.labeled
-*.log
 
 # === Compiled notebooks or cache ===
 *.html
