@@ -64,6 +64,7 @@ def print_row_inline(df, row_index):
 # Main execution block
 def main():
     filepath = input('Enter file path: ')
+    print(filepath)
     clean_path = "conn_cleaned.log"
 
     preprocess_zeek_labels(filepath, clean_path)
