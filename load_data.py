@@ -9,19 +9,22 @@ pd.set_option('display.max_colwidth', None)
 # Fix malformed label fields in data lines (space-separated labels at end)
 def preprocess_zeek_labels(input_path, output_path):
     with open(input_path, 'r') as infile, open(output_path, 'w') as outfile:
+        lines = []
         for line in infile:
             if line.startswith('#'):
-                outfile.write(line)
+                lines.append(line)
                 continue
 
             parts = line.rstrip('\n').split('\t')
             if len(parts) == 21:
-                last_part = parts[-1].strip()
-                split_labels = last_part.split()
+                split_labels = parts[-1].strip().split()
                 if len(split_labels) == 3:
                     parts = parts[:-1] + split_labels
 
-            outfile.write('\t'.join(parts) + '\n')
+            lines.append('\t'.join(parts) + '\n')
+
+        outfile.writelines(lines)
+
 
 # Load cleaned Zeek log using parsed header and fixed label fields
 def load_zeek_log(filepath):
@@ -45,7 +48,7 @@ def load_zeek_log(filepath):
             data_lines.append(line.rstrip('\n'))
 
     data_str = '\n'.join(data_lines)
-    df = pd.read_csv(StringIO(data_str), sep='\t', names=columns, na_values=["-", "(empty)"])
+    df = pd.read_csv(StringIO(data_str), sep='\t', names=columns, na_values=["-", "(empty)"], low_memory=False)
     return df
 
 # Check for missing values
@@ -64,6 +67,7 @@ def main():
     clean_path = "conn_cleaned.log"
 
     preprocess_zeek_labels(filepath, clean_path)
+    print("Preprocessing done.")
     df = load_zeek_log(clean_path)
 
     print("DataFrame Loaded. Shape:", df.shape)
@@ -84,6 +88,7 @@ def main():
     export = input("\nWould you like to export the cleaned DataFrame to CSV? (y/n): ").strip().lower()
     if export == 'y':
         outname = input("Enter output CSV filename (e.g., output.csv): ").strip()
+        print("\nSaving cleaned DataFrame to '{}'...".format(outname))
         df.to_csv(outname, index=False)
         print(f"DataFrame exported to {outname}")
 
