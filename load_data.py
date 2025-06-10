@@ -45,7 +45,7 @@ def load_zeek_log(filepath):
             data_lines.append(line.rstrip('\n'))
 
     data_str = '\n'.join(data_lines)
-    df = pd.read_csv(StringIO(data_str), sep='\t', names=columns, na_values='-')
+    df = pd.read_csv(StringIO(data_str), sep='\t', names=columns, na_values=["-", "(empty)"])
     return df
 
 # Check for missing values
