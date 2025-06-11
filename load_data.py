@@ -28,27 +28,23 @@ def preprocess_zeek_labels(input_path, output_path):
 
 # Load cleaned Zeek log using parsed header and fixed label fields
 def load_zeek_log(filepath):
-    with open(filepath, 'r') as f:
-        lines = f.readlines()
+    columns = [
+        'ts', 'uid', 'id.orig_h', 'id.orig_p', 'id.resp_h', 'id.resp_p',
+        'proto', 'service', 'duration', 'orig_bytes', 'resp_bytes',
+        'conn_state', 'local_orig', 'local_resp', 'missed_bytes',
+        'history', 'orig_pkts', 'orig_ip_bytes', 'resp_pkts',
+        'resp_ip_bytes', 'tunnel_parents', 'label', 'detailed-label'
+    ]
 
-    columns = []
-    data_lines = []
-
-    for line in lines:
-        if line.startswith('#fields'):
-            raw_fields = line.strip().split('\t')[1:]  # remove '#fields'
-            fixed = []
-            for part in raw_fields:
-                if ' ' in part:
-                    fixed.extend(part.strip().split())
-                else:
-                    fixed.append(part)
-            columns = fixed
-        elif not line.startswith('#'):
-            data_lines.append(line.rstrip('\n'))
-
-    data_str = '\n'.join(data_lines)
-    df = pd.read_csv(StringIO(data_str), sep='\t', names=columns, na_values=["-", "(empty)"], low_memory=False)
+    df = pd.read_csv(
+        filepath,
+        sep='\t',
+        names=columns,
+        comment='#',
+        parse_dates=['ts'],
+        na_values=["-", "(empty)"],
+        chunksize=2_000_000
+    )
     return df
 
 # Check for missing values
@@ -69,11 +65,12 @@ def main():
 
     preprocess_zeek_labels(filepath, clean_path)
     print("Preprocessing done.")
-    df = load_zeek_log(clean_path)
 
-    print("DataFrame Loaded. Shape:", df.shape)
+    chunk_iter = load_zeek_log(clean_path)
+    first_chunk = next(chunk_iter)
+    print("First chunk loaded. Shape:", first_chunk.shape)
 
-    missing_values = check_missing_values(df)
+    missing_values = check_missing_values(first_chunk)
     if not missing_values.empty:
         print("\nMissing Values:")
         print(missing_values)
@@ -81,17 +78,23 @@ def main():
         print("\nNo missing values found.")
 
     print("\nFirst full row:")
-    print_row_inline(df, 0)
+    print_row_inline(first_chunk, 0)
 
     print("\nSecond full row:")
-    print_row_inline(df, 1)
+    print_row_inline(first_chunk, 1)
 
-    export = input("\nWould you like to export the cleaned DataFrame to CSV? (y/n): ").strip().lower()
+    export = input("\nWould you like to export all chunks to a CSV file? (y/n): ").strip().lower()
     if export == 'y':
         outname = input("Enter output CSV filename (e.g., output.csv): ").strip()
-        print("\nSaving cleaned DataFrame to '{}'...".format(outname))
-        df.to_csv(outname, index=False)
-        print(f"DataFrame exported to {outname}")
+        print(f"\nSaving cleaned DataFrame to '{outname}'...")
+
+        # Re-load the iterator from the start
+        chunk_iter = load_zeek_log(clean_path)
+        for i, chunk in enumerate(chunk_iter):
+            chunk.to_csv(outname, mode='a', header=(i == 0), index=False)
+
+        print(f"All chunks exported to {outname}")
+
 
 if __name__ == "__main__":
     main()
