@@ -14,6 +14,7 @@ venv/
 env/
 .venv/
 .env/
+.env
 
 # === Jupyter and IPython ===
 .ipynb_checkpoints/
