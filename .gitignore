@@ -34,6 +34,7 @@ Thumbs.db
 *.bak
 *.tmp
 *.labeled
+*.parquet
 
 # === Compiled notebooks or cache ===
 *.html
