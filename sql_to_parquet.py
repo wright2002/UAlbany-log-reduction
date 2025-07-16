@@ -9,16 +9,16 @@ load_dotenv()
 # Get DB credentials from env
 username = os.getenv('PGUSER')
 password = os.getenv('PGPASSWORD')
-host = os.getenv('PGHOST', 'localhost')
+host = os.getenv('PGHOST')
 port = os.getenv('PGPORT', '5432')
 database = os.getenv('PGDATABASE')
 
 # Create engine and query
 engine = create_engine(f'postgresql://{username}:{password}@{host}:{port}/{database}')
-query = "SELECT * FROM training_data_2;"
+query = "SELECT * FROM training_data_1_1;"
 df = pd.read_sql_query(query, engine)
 
 print(df.head())
 print(df.shape)
 
-df.to_parquet("training_data_2.parquet", index=False)
+df.to_parquet("training_data_1_1.parquet", index=False)

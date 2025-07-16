@@ -1,46 +1,51 @@
-DROP MATERIALIZED VIEW IF EXISTS training_data_1;
+DROP MATERIALIZED VIEW IF EXISTS benign_data_7_1;
 
-CREATE MATERIALIZED VIEW training_data_1 AS
-WITH history_array AS (
+CREATE MATERIALIZED VIEW benign_data_7_1 AS
+WITH filtered_sessions AS (
+    SELECT *
+    FROM session
+    WHERE source_file = 'ctu_honey_7-1.csv'
+),
+history_array AS (
     SELECT
         sh.uid,
         ARRAY_AGG(hl.code ORDER BY sh.index) AS history_codes
     FROM SessionHistory sh
     JOIN HistoryLegend hl ON sh.history_id = hl.id
     GROUP BY sh.uid
+),
+label_string AS (
+    SELECT
+        sl.uid,
+        STRING_AGG(l.label_name, '-' ORDER BY l.label_name) AS detailed_label
+    FROM SessionLabel sl
+    JOIN Label l ON sl.label_id = l.label_id
+    GROUP BY sl.uid
 )
 
 SELECT
     -- Engineered features
-    (CAST(split_part(s.id_orig_h, '.', 1) AS bigint) << 24) +
-    (CAST(split_part(s.id_orig_h, '.', 2) AS bigint) << 16) +
-    (CAST(split_part(s.id_orig_h, '.', 3) AS bigint) << 8) +
-    CAST(split_part(s.id_orig_h, '.', 4) AS bigint) AS id_orig_h_int,
-
-    (CAST(split_part(s.id_resp_h, '.', 1) AS bigint) << 24) +
-    (CAST(split_part(s.id_resp_h, '.', 2) AS bigint) << 16) +
-    (CAST(split_part(s.id_resp_h, '.', 3) AS bigint) << 8) +
-    CAST(split_part(s.id_resp_h, '.', 4) AS bigint) AS id_resp_h_int,
-
     (EXTRACT(EPOCH FROM TO_TIMESTAMP(s.ts)) % 86400)::int AS time_of_day_seconds,
 
     CASE WHEN id_orig_p <= 1023 THEN 1 ELSE 0 END AS orig_port_well_known,
     CASE WHEN id_orig_p > 1023 AND id_orig_p <= 49151 THEN 1 ELSE 0 END AS orig_port_registered,
     CASE WHEN id_orig_p > 49151 THEN 1 ELSE 0 END AS orig_port_ephemeral,
 
-    CASE WHEN id_resp_p = 22 THEN 1 ELSE 0 END AS resp_port_22,
-    CASE WHEN id_resp_p = 23 THEN 1 ELSE 0 END AS resp_port_23,
-    CASE WHEN id_resp_p = 80 THEN 1 ELSE 0 END AS resp_port_80,
-    CASE WHEN id_resp_p = 81 THEN 1 ELSE 0 END AS resp_port_81,
-    CASE WHEN id_resp_p = 443 THEN 1 ELSE 0 END AS resp_port_443,
-    CASE WHEN id_resp_p = 8080 THEN 1 ELSE 0 END AS resp_port_8080,
-    CASE WHEN id_resp_p = 8081 THEN 1 ELSE 0 END AS resp_port_8081,
-    CASE WHEN id_resp_p = 2323 THEN 1 ELSE 0 END AS resp_port_2323,
-    CASE WHEN id_resp_p = 992 THEN 1 ELSE 0 END AS resp_port_992,
-    CASE WHEN id_resp_p = 37215 THEN 1 ELSE 0 END AS resp_port_37215,
-    CASE WHEN id_resp_p = 52869 THEN 1 ELSE 0 END AS resp_port_52869,
+    CASE WHEN id_resp_p = 20 THEN 1 ELSE 0 END AS resp_port_20,     -- FTP Data
+    CASE WHEN id_resp_p = 21 THEN 1 ELSE 0 END AS resp_port_21,     -- FTP Control
+    CASE WHEN id_resp_p = 22 THEN 1 ELSE 0 END AS resp_port_22,     -- SSH
+    CASE WHEN id_resp_p = 23 THEN 1 ELSE 0 END AS resp_port_23,     -- Telnet
+    CASE WHEN id_resp_p = 25 THEN 1 ELSE 0 END AS resp_port_25,     -- SMTP
+    CASE WHEN id_resp_p = 53 THEN 1 ELSE 0 END AS resp_port_53,     -- DNS
+    CASE WHEN id_resp_p = 80 THEN 1 ELSE 0 END AS resp_port_80,     -- HTTP
+    CASE WHEN id_resp_p = 110 THEN 1 ELSE 0 END AS resp_port_110,   -- POP3
+    CASE WHEN id_resp_p = 143 THEN 1 ELSE 0 END AS resp_port_143,   -- IMAP
+    CASE WHEN id_resp_p = 443 THEN 1 ELSE 0 END AS resp_port_443,   -- HTTPS
+    CASE WHEN id_resp_p = 993 THEN 1 ELSE 0 END AS resp_port_993,   -- IMAPS
+    CASE WHEN id_resp_p = 3389 THEN 1 ELSE 0 END AS resp_port_3389, -- RDP
+    CASE WHEN id_resp_p = 8080 THEN 1 ELSE 0 END AS resp_port_8080, -- HTTP Alternate
     CASE 
-      WHEN id_resp_p IN (22, 23, 80, 81, 443, 8080, 8081, 2323, 992, 37215, 52869) THEN 0
+      WHEN id_resp_p IN (20, 21, 22, 23, 25, 53, 80, 110, 143, 443, 993, 3389, 8080) THEN 0
       ELSE 1 
     END AS resp_port_other,
 
@@ -348,12 +353,28 @@ SELECT
 	CASE WHEN ha.history_codes[12] = 'G' THEN 1 ELSE 0 END AS history_12_GG,
 	CASE WHEN ha.history_codes[12] = 'I' THEN 1 ELSE 0 END AS history_12_II,
 
-    CASE WHEN s.simple_label = 'Malicious' THEN 1 ELSE 0 END AS simple_label_encoded
+    CASE WHEN s.simple_label = 'Malicious' THEN 1 ELSE 0 END AS simple_label_encoded,
 
-FROM session_ctu_malware_1_1 s
+	CASE WHEN ls.detailed_label LIKE '%C&C%' THEN 1 ELSE 0 END AS label_c2c,
+	CASE WHEN ls.detailed_label LIKE '%FileDownload%' THEN 1 ELSE 0 END AS label_filedownload,
+	CASE WHEN ls.detailed_label LIKE '%HeartBeat%' THEN 1 ELSE 0 END AS label_heartbeat,
+	CASE WHEN ls.detailed_label LIKE '%DDoS%' THEN 1 ELSE 0 END AS label_ddos,
+	CASE WHEN ls.detailed_label LIKE '%Okiru%' THEN 1 ELSE 0 END AS label_okiru,
+	CASE WHEN ls.detailed_label LIKE '%Torii%' THEN 1 ELSE 0 END AS label_torii,
+	CASE WHEN ls.detailed_label LIKE '%PartOfAHorizontalPortScan%' THEN 1 ELSE 0 END AS label_horizontal_scan,
+	CASE WHEN ls.detailed_label LIKE '%Attack%' THEN 1 ELSE 0 END AS label_attack
+
+
+FROM filtered_sessions s
 LEFT JOIN history_array ha ON s.uid = ha.uid
 LEFT JOIN SessionDuration sd ON s.uid = sd.uid
 LEFT JOIN SessionOrigBytes so ON s.uid = so.uid
 LEFT JOIN SessionRespBytes sr ON s.uid = sr.uid
 LEFT JOIN SessionService ss ON s.uid = ss.uid
-LEFT JOIN Service sv ON ss.svc_id = sv.svc_id;
+LEFT JOIN Service sv ON ss.svc_id = sv.svc_id
+LEFT JOIN label_string ls ON s.uid = ls.uid
+;
+
+SELECT *
+FROM benign_data_7_1
+LIMIT 10;
