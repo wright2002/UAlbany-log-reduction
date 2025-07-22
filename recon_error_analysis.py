@@ -7,6 +7,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import csv
 
 DATAFILE = "training_data_1_1"
+EPOCHS = 10
+LATENT_VECTOR_SIZE = 8
 
 # === Load and Scale Data ===
 print("Loading data from Parquet...")
@@ -28,17 +30,17 @@ X_scaled = scaler.fit_transform(X)
 
 # === Define Autoencoder ===
 class Autoencoder(nn.Module):
-    def __init__(self, input_dim, latent_dim=20):
+    def __init__(self, input_dim, latent_dim=LATENT_VECTOR_SIZE):
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(input_dim, 32),
             nn.ReLU(),
-            nn.Linear(128, latent_dim)
+            nn.Linear(32, latent_dim)
         )
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 128),
+            nn.Linear(latent_dim, 32),
             nn.ReLU(),
-            nn.Linear(128, input_dim)
+            nn.Linear(32, input_dim)
         )
 
     def forward(self, x):
@@ -63,7 +65,7 @@ error_log = []
 
 # Updated training loop
 print("Training autoencoder with per-column reconstruction error tracking...")
-for epoch in range(10):
+for epoch in range(EPOCHS):
     epoch_errors = np.zeros(X_scaled.shape[1])
     total_samples = 0
     total_loss = 0
