@@ -15,10 +15,10 @@ database = os.getenv('PGDATABASE')
 
 # Create engine and query
 engine = create_engine(f'postgresql://{username}:{password}@{host}:{port}/{database}')
-query = "SELECT * FROM training_data_1_1;"
+query = "SELECT * FROM training_data_3_1;"
 df = pd.read_sql_query(query, engine)
 
 print(df.head())
 print(df.shape)
 
-df.to_parquet("training_data_1_1.parquet", index=False)
+df.to_parquet("training_data_3_1.parquet", index=False)

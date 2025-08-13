@@ -8,11 +8,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 
-# ---------- Parameters ----------
-BATCH_SIZE = 64
-EPOCHS = 10
-LATENT_DIM = 8  # Number of filters in final encoder layer
-
 # === Load from Parquet ===
 print("Loading data from Parquet...")
 df = pd.read_parquet("training_data_1.parquet")

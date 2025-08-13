@@ -11,11 +11,11 @@ from sklearn.metrics import classification_report, confusion_matrix
 # ---------- Parameters ----------
 BATCH_SIZE = 64
 EPOCHS = 10
-LATENT_DIM = 4  # Number of filters in final encoder layer
+LATENT_DIM = 2
 
 # === Load from Parquet ===
 print("Loading data from Parquet...")
-df = pd.read_parquet("training_data_1.parquet")
+df = pd.concat([pd.read_parquet("training_data_1_1.parquet"), pd.read_parquet("training_data_3_1.parquet")])
 print("Data loaded.")
 
 # 21 one-hot codes from Zeek history
@@ -34,6 +34,13 @@ X = df[selected_cols].values.reshape(-1, 12, 21).astype(np.float32)
 y = df["simple_label_encoded"].values.astype(np.int64)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+"""
+X_train = df1[selected_cols].values.reshape(-1, 12, 21).astype(np.float32)
+X_test = df2[selected_cols].values.reshape(-1, 12, 21).astype(np.float32)
+y_train = df1["simple_label_encoded"].values.astype(np.int64)
+y_test = df2["simple_label_encoded"].values.astype(np.int64)
+"""
 
 train_loader = DataLoader(TensorDataset(torch.tensor(X_train), torch.tensor(X_train)), batch_size=BATCH_SIZE, shuffle=True)
 
@@ -72,20 +79,24 @@ class CNN1DAutoencoder(nn.Module):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = CNN1DAutoencoder().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-criterion = nn.MSELoss()
+criterion = nn.BCELoss()
 
-# ---------- Train Autoencoder ----------
+# ---------- Train Autoencoder with BCE (average loss) ----------
 model.train()
 for epoch in range(EPOCHS):
-    total_loss = 0
+    epoch_loss = 0
+    batch_count = 0
     for xb, yb in train_loader:
+        xb, yb = xb.to(device), yb.to(device)
         optimizer.zero_grad()
         preds = model(xb)
-        loss = criterion(preds, yb)
+        loss = criterion(preds, yb)  # already averaged over batch
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-    print(f"Epoch {epoch+1} Loss: {total_loss:.4f}")
+        epoch_loss += loss.item()
+        batch_count += 1
+    avg_loss = epoch_loss / batch_count
+    print(f"Epoch {epoch+1} Avg BCE Loss: {avg_loss:.6f}")
 
 # ---------- Extract Latent Vectors ----------
 model.eval()
